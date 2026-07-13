@@ -1,0 +1,4 @@
+{
+  "file_scan_exclusions": ["**/.git", "**/.liger-cache"],
+  "tab_size": 2
+}

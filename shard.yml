@@ -1,0 +1,19 @@
+name: popup
+version: 0.1.0
+
+authors:
+  - GalactHD <139361517+GalactHD@users.noreply.github.com>
+
+targets:
+  popup:
+    main: src/popup.cr
+
+crystal: '>= 1.20.1'
+
+license: MIT
+
+dependencies:
+  crest:
+    github: mamantoha/crest
+  option_builder:
+    github: naqvis/option_builder
