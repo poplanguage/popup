@@ -1,5 +1,6 @@
 require "option_builder"
-require "term-progress"
+require "./installer"
+require "./github"
 
 class Popup::CLI
   def self.setup
