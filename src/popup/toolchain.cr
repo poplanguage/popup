@@ -39,15 +39,11 @@ class Popup::Toolchain
       File.symlink(version, default_link)
     end
 
-    write_pop_shim(target)
-  end
-
-  private def write_pop_shim(target : String) : Nil
     Dir.mkdir_p(@bin_dir)
 
     content = <<-SHIM
-    #!/usr/bin/env bash
-    exec "$HOME/.popup/toolchains/default/pop-#{target}" "$@"
+      #!/usr/bin/env bash
+      exec "$HOME/.popup/toolchains/default/pop-#{target}" "$@"
     SHIM
 
     File.write(@shim_path, content)
