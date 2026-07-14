@@ -4,8 +4,8 @@ module Popup::GitHub
   def self.client : Crest::Resource
     Crest::Resource.new("https://api.github.com/",
       headers: {
-        "Content-Type" => "application/vnd.github+json",
-        "X-GitHub-Api-Version" => "2026-03-10"
+        "Content-Type"         => "application/vnd.github+json",
+        "X-GitHub-Api-Version" => "2026-03-10",
       }
     )
   end
