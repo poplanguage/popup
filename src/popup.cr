@@ -1,5 +1,5 @@
 require "./popup/version"
-require "./popup/cli"
+require "./popup/cli/main"
 require "./popup/utils/logger"
 
 require "crest"
