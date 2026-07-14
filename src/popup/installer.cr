@@ -18,16 +18,17 @@ class Popup::Installer
       name.includes?(target) && !name.ends_with?(".sha256")
     end
 
-    unless asset
+    if asset
+      url = asset["browser_download_url"].as_s
+      temp_dir = File.tempname("popup")
+      Dir.mkdir_p(temp_dir)
+
+      archive = File.join(temp_dir, File.basename(url))
+      download(url, archive)
+      archive
+    else
       raise "no asset found for target '#{target}' in release #{@version}"
     end
-
-    url = asset["browser_download_url"].as_s
-    tmp_dir = File.tempname("popup")
-    Dir.mkdir_p(tmp_dir)
-    archive = File.join(tmp_dir, File.basename(url))
-    download(url, archive)
-    archive
   end
 
   private def download(url : String, path : String)
