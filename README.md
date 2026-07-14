@@ -1,12 +1,14 @@
 # popup
 
+> **WARNING: This software is under active development and is unstable.**
+
 A toolchain manager for Pop Language. Downloads, installs, and manages Pop compiler and runtime distributions.
 
 `popup` handles toolchain distribution independently from `pop`, the language and package command. It fetches verified release artifacts and detects the host platform to install the correct binary.
 
 ## Installation
 
-1. ### Build from source:
+### Build from source
 
 ```sh
 git clone git@github.com:poplanguage/popup
@@ -15,7 +17,7 @@ shards install
 shards build
 ```
 
-2. ### Bootstrap script (Work In Progress)
+### Bootstrap script (WIP)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | bash
@@ -34,17 +36,43 @@ Install a Pop Lang toolchain. If no version is specified, the latest release is 
 popup install
 
 # Install a specific version
-popup install v0.1.0
+popup install v0.1.0-rc.3
 ```
 
 The installer:
+
 - detects the host platform (architecture and OS)
 - fetches the matching release artifact from the `poplanguage/pop` GitHub repository
-- downloads the binary to the current directory
+- downloads the archive with progress bar, speed, and ETA
+- extracts the toolchain to `~/.popup/toolchains/<version>/`
+- creates a `default` symlink to the active toolchain
+- writes a `pop` shim to `~/.popup/bin/pop`
+- offers to add `~/.popup/bin` to your PATH
+
+```sh
+popup toolchains list
+```
+
+List installed toolchain versions.
+
+## Directory structure
+
+```text
+~/.popup/
+  bin/
+    pop              # shim that delegates to the active toolchain
+  toolchains/
+    default -> v0.1.0-rc.3   # symlink to the active version
+    v0.1.0-rc.3/             # extracted toolchain files
+```
+
+## Configuration
+
+`popup` respects the `POPUP_HOME` environment variable. If unset, it defaults to `~/.popup`.
 
 ## Uninstallation
 
-Run the bootstrap script and select the uninstall option, or remove `~/.popup` manually.
+Remove `~/.popup` manually. Remove the PATH line from your shell profile if you added it.
 
 ## Development
 
