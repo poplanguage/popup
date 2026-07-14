@@ -17,6 +17,8 @@ dependencies:
     github: mamantoha/crest
   option_builder:
     github: naqvis/option_builder
+  term-prompt:
+    github: crystal-term/prompt
 
 development_dependencies:
   webmock:
