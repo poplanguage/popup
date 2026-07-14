@@ -21,21 +21,17 @@ module Popup::Utils::Target
     {% end %}
   end
 
-  def windows? : Bool
-    {% if flag?(:win32) %}
-      true
-    {% else %}
-      false
-    {% end %}
-  end
-
-  def target_string : String?
+  def target_string : String
     if linux?
       if aarch64?
         "aarch64-unknown-linux-gnu"
       elsif x86_64?
         "x86_64-unknown-linux-gnu"
+      else
+        raise "unsupported architecture: #{current_arch}"
       end
+    else
+      raise "unsupported platform: only linux is supported"
     end
   end
 end
