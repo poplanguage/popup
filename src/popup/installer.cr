@@ -7,13 +7,7 @@ class Popup::Installer
   end
 
   def install
-    target = if Utils::Target.linux?
-      if Utils::Target.aarch64?
-        "aarch64-unknown-linux-gnu"
-      elsif Utils::Target.x86_64?
-        "x86_64-unknown-linux-gnu"
-      end
-    end
+    target = Utils::Target.target_string
 
     unless target
       raise "This platform is not supported by Pop: #{`uname -m -o`}"
