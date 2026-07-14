@@ -34,7 +34,7 @@ jobs:
           key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
 
       - name: Install shards
-        run: shards check || shards install
+        run: shards check || shards install --without-development
 
       - name: Check if source compiles
         run: crystal run src/popup.cr --no-codegen
