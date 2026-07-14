@@ -30,10 +30,10 @@ class Popup::Installer
 
     if asset
       url = asset["browser_download_url"].as_s
-      puts "Downloading: #{url}"
+      Log.debug { "Downloading: #{url}" }
       download(url)
     else
-      STDERR.puts "No asset was found for this target: #{target}"
+      Log.error { "No asset was found for this target: #{target}" }
     end
   end
 
