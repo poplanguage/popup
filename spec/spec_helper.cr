@@ -16,8 +16,6 @@ module InstallUtils
 
   DOWNLOAD_URL = "https://github.com/poplanguage/pop/releases/download/v0.1.0/pop-x86_64-unknown-linux-gnu.tar.gz"
 
-  EXPECTED_FILE = "pop-x86_64-unknown-linux-gnu.tar.gz"
-
   def release_with_binary
     {
       "tag_name" => "v0.1.0",
