@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/crystal-ameba/ameba/refs/heads/master/.ameba.yml.schema.json
+
+Excluded:
+  - spec/**
+  - docs/**
+  - bin/**
