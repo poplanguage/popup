@@ -1,3 +1,5 @@
+require "file_utils"
+
 class Popup::Installer::Setup
   def initialize(@version : String, @archive_path : String, @toolchains_dir : String)
   end
@@ -14,12 +16,11 @@ class Popup::Installer::Setup
       raise "failed to extract #{File.basename(@archive_path)}"
     end
 
-    Dir.mkdir_p(version_dir)
-    Dir.children(tmp).each do |entry|
-      File.rename(File.join(tmp, entry), File.join(version_dir, entry))
+    if Dir.exists?(version_dir)
+      FileUtils.rm_rf(version_dir)
     end
 
+    File.rename(tmp, version_dir)
     File.delete(@archive_path)
-    Dir.delete(tmp)
   end
 end
