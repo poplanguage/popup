@@ -1,8 +1,5 @@
 require "json"
 
-require "./github"
-require "./utils/target"
-
 module Popup
   class Installer
     def initialize(@version : String)

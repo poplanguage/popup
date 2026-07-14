@@ -1,5 +1,3 @@
-require "../toolchain"
-
 require "colorize"
 
 class Popup::CLI::Toolchains

@@ -1,9 +1,4 @@
 require "term-prompt"
-require "../installer"
-require "../installer/setup"
-require "../github"
-require "../toolchain"
-require "../utils/target"
 
 class Popup::CLI::Install
   def self.register(cmd)
