@@ -10,7 +10,7 @@ module Popup::GitHub
     )
   end
 
-  def self.lastest_release_tag : String
+  def self.latest_release_tag : String
     request = Popup::GitHub.client.get("repos/poplanguage/pop/releases")
     body = JSON.parse(request.body).as_a
 
