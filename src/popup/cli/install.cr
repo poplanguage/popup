@@ -15,12 +15,12 @@ class Popup::CLI::Install
       end
 
       install.run do
-        current = version.empty? ? GitHub.latest_release_tag : version
+        current_version = version.empty? ? GitHub.latest_release_tag : version
+        archive_path = Installer.new(current_version).install
         toolchain = Toolchain.new
-        archive_path = Installer.new(current).install
 
-        Installer::Setup.new(current, archive_path, toolchain.toolchains_dir).run
-        toolchain.install(current, Utils::Target.target_string)
+        Installer::Setup.new(current_version, archive_path, toolchain.toolchains_dir).run
+        toolchain.install(current_version, Utils::Target.target_string)
 
         prompt_add_to_path(toolchain)
       end
@@ -28,7 +28,9 @@ class Popup::CLI::Install
   end
 
   private def self.prompt_add_to_path(toolchain : Toolchain) : Nil
-    return if ENV["PATH"].to_s.split(":").includes?(toolchain.bin_dir)
+    if ENV["PATH"].split(":").includes?(toolchain.bin_dir)
+      return
+    end
 
     profile = detect_shell_profile
     return unless profile
@@ -69,10 +71,12 @@ class Popup::CLI::Install
   end
 
   private def self.already_configured?(profile : String) : Bool
-    return false unless File.exists?(profile)
-
-    File.read_lines(profile).any? do |line|
-      line.strip == %(export PATH="$HOME/.popup/bin:$PATH")
+    if File.exists?(profile)
+      true
+    else
+      File.read_lines(profile).any? do |line|
+        line.strip == %(export PATH="$HOME/.popup/bin:$PATH")
+      end
     end
   end
 end
