@@ -12,6 +12,9 @@ describe Installer do
 
     context "when a matching asset exists" do
       it "downloads the correct binary for the current platform" do
+        WebMock.stub(:head, InstallUtils::DOWNLOAD_URL)
+          .to_return(headers: {"Content-Length" => "16"})
+
         WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
           .to_return(body: InstallUtils.release_with_binary.to_json)
 
@@ -25,6 +28,9 @@ describe Installer do
       end
 
       it "skips sha256 files when selecting the binary" do
+        WebMock.stub(:head, InstallUtils::DOWNLOAD_URL)
+          .to_return(headers: {"Content-Length" => "16"})
+
         WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
           .to_return(body: InstallUtils.release_with_binary_and_sha.to_json)
 
