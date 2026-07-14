@@ -15,8 +15,8 @@ class Popup::Toolchain
   def versions : Array(String)
     if Dir.exists?(@toolchains_dir)
       Dir.children(@toolchains_dir)
-         .select(&.starts_with?("v"))
-         .sort!
+        .select(&.starts_with?("v"))
+        .sort!
     else
       [] of String
     end
@@ -34,9 +34,9 @@ class Popup::Toolchain
     Dir.mkdir_p(@toolchains_dir)
 
     if File.symlink?(default_link)
-      File.symlink(version, default_link)
-    else
       File.delete(default_link)
+    else
+      File.symlink(version, default_link)
     end
 
     write_pop_shim(target)
