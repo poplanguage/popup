@@ -13,11 +13,13 @@ class Popup::Toolchain
   end
 
   def versions : Array(String)
-    return [] of String unless Dir.exists?(@toolchains_dir)
-
-    Dir.children(@toolchains_dir)
-      .select(&.starts_with?("v"))
-      .sort!
+    if Dir.exists?(@toolchains_dir)
+      Dir.children(@toolchains_dir)
+         .select(&.starts_with?("v"))
+         .sort!
+    else
+      [] of String
+    end
   end
 
   def active_version : String
@@ -28,18 +30,19 @@ class Popup::Toolchain
     Dir.exists?(File.join(@toolchains_dir, version))
   end
 
-  def set_active(version : String) : Nil
-    Dir.mkdir_p(@toolchains_dir)
-    File.delete(default_link) if File.symlink?(default_link)
-    File.symlink(version, default_link)
-  end
-
   def install(version : String, target : String) : Nil
-    set_active(version)
+    Dir.mkdir_p(@toolchains_dir)
+
+    if File.symlink?(default_link)
+      File.symlink(version, default_link)
+    else
+      File.delete(default_link)
+    end
+
     write_pop_shim(target)
   end
 
-  def write_pop_shim(target : String) : Nil
+  private def write_pop_shim(target : String) : Nil
     Dir.mkdir_p(@bin_dir)
 
     content = <<-SHIM
