@@ -16,10 +16,6 @@ shards:
     git: https://github.com/mamantoha/http_proxy.git
     version: 0.15.1
 
-  minitest:
-    git: https://github.com/ysbaddaden/minitest.cr.git
-    version: 1.6.2
-
   option_builder:
     git: https://github.com/naqvis/option_builder.git
     version: 0.1.0+git.commit.2b9c0d3ba2164f712ca0efa7331bb326be6139fa
