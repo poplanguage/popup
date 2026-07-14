@@ -65,8 +65,6 @@ class Popup::CLI::Install
       File.join(ENV["HOME"], ".bashrc")
     when "fish"
       File.join(ENV["HOME"], ".config", "fish", "config.fish")
-    else
-      nil
     end
   end
 
