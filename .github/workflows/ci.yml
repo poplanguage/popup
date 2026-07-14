@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+
+jobs:
+  check:
+    name: Format and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Update packages
+        run: apt-get update && apt-get upgrade -y
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: 1.20.1
+
+      - name: Cache shards
+        uses: actions/cache@v4
+        with:
+          path: lib
+          key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
+
+      - name: Install shards
+        run: shards check || shards install
+
+      - name: Check if source compiles
+        run: crystal run src/popup.cr --no-codegen
+
+      - name: Run tests
+        run: crystal spec --verbose
+
+      - name: Build
+        run: shards build
