@@ -4,19 +4,14 @@ require "json"
 require "crest"
 require "file_utils"
 
-require "../src/popup/version"
-require "../src/popup/github"
-require "../src/popup/utils/target"
-require "../src/popup/installer"
+require "../src/popup"
 
 include Popup
 
 module InstallUtils
   extend self
 
-  DOWNLOAD_URL  = "https://github.com/poplanguage/pop/releases/download/v0.1.0/pop-x86_64-unknown-linux-gnu.tar.gz"
-
-  EXPECTED_FILE = "pop-x86_64-unknown-linux-gnu.tar.gz"
+  DOWNLOAD_URL = "https://github.com/poplanguage/pop/releases/download/v0.1.0/pop-x86_64-unknown-linux-gnu.tar.gz"
 
   def release_with_binary
     {

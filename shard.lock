@@ -20,6 +20,34 @@ shards:
     git: https://github.com/naqvis/option_builder.git
     version: 0.1.0+git.commit.2b9c0d3ba2164f712ca0efa7331bb326be6139fa
 
+  term-color:
+    git: https://github.com/crystal-term/color.git
+    version: 1.0.0
+
+  term-cursor:
+    git: https://github.com/crystal-term/cursor.git
+    version: 1.0.0
+
+  term-progress:
+    git: https://github.com/crystal-term/progress.git
+    version: 1.0.0
+
+  term-prompt:
+    git: https://github.com/crystal-term/prompt.git
+    version: 1.0.0
+
+  term-reader:
+    git: https://github.com/crystal-term/reader.git
+    version: 1.0.0
+
+  term-screen:
+    git: https://github.com/crystal-term/screen.git
+    version: 1.0.0
+
+  term-spinner:
+    git: https://github.com/crystal-term/spinner.git
+    version: 1.0.0
+
   webmock:
     git: https://github.com/manastech/webmock.cr.git
     version: 0.14.0+git.commit.fde6b20d5b80401a967e044b1a3e80ee391bed60

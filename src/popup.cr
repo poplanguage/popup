@@ -1,6 +1,7 @@
-require "./popup/version"
-require "./popup/cli"
-require "./popup/utils/logger"
+require "./popup/*"
+require "./popup/cli/*"
+require "./popup/installer/*"
+require "./popup/utils/*"
 
 require "crest"
 

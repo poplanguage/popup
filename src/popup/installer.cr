@@ -1,49 +1,35 @@
 require "json"
+
 require "./github"
 require "./utils/target"
 
-class Popup::Installer
-  def initialize(@version : String)
-  end
+module Popup
+  class Installer
+    def initialize(@version : String)
+    end
 
-  def install
-    target = if Utils::Target.linux?
-      if Utils::Target.aarch64?
-        "aarch64-unknown-linux-gnu"
-      elsif Utils::Target.x86_64?
-        "x86_64-unknown-linux-gnu"
+    def install : String
+      target = Utils::Target.target_string
+
+      response = JSON.parse(
+        GitHub.client.get("repos/poplanguage/pop/releases/tags/#{@version}").body
+      )
+
+      asset = response["assets"].as_a.find do |content|
+        name = content["name"].as_s
+        name.includes?(target) && !name.ends_with?(".sha256")
       end
-    end
 
-    unless target
-      raise "This platform is not supported by Pop: #{`uname -m -o`}"
-    end
+      unless asset
+        raise "no asset found for target '#{target}' in release #{@version}"
+      end
 
-    response = JSON.parse(
-      GitHub.client.get("repos/poplanguage/pop/releases/tags/#{@version}").body
-    )
-
-    asset = response["assets"].as_a.find do |content|
-      name = content["name"].as_s
-      name.includes?(target) && !name.ends_with?(".sha256")
-    end
-
-    if asset
       url = asset["browser_download_url"].as_s
-      Log.debug { "Downloading: #{url}" }
-      download(url)
-    else
-      Log.error { "No asset was found for this target: #{target}" }
-    end
-  end
-
-  private def download(url : String)
-    filename = File.basename(url)
-
-    Crest.get(url) do |response|
-      File.open(filename, "wb") do |file|
-        IO.copy(response.body_io, file)
-      end
+      tmp_dir = File.tempname("popup")
+      Dir.mkdir_p(tmp_dir)
+      archive = File.join(tmp_dir, File.basename(url))
+      Downloader.new(url, archive).run
+      archive
     end
   end
 end

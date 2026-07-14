@@ -1,7 +1,7 @@
 require "./spec_helper"
 
 describe GitHub do
-  describe "#lastest_release_tag" do
+  describe "#latest_release_tag" do
     before_each do
       WebMock.reset
     end
@@ -10,7 +10,7 @@ describe GitHub do
       WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases")
         .to_return(body: [{"tag_name" => "v0.2.0"}].to_json)
 
-      tag = GitHub.lastest_release_tag
+      tag = GitHub.latest_release_tag
 
       tag.should eq("v0.2.0")
     end
@@ -24,7 +24,7 @@ describe GitHub do
       WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases")
         .to_return(body: releases.to_json)
 
-      tag = GitHub.lastest_release_tag
+      tag = GitHub.latest_release_tag
 
       tag.should eq("v0.2.0")
     end
@@ -34,7 +34,7 @@ describe GitHub do
         .to_return(body: "[]")
 
       expect_raises(Exception) do
-        GitHub.lastest_release_tag
+        GitHub.latest_release_tag
       end
     end
 
@@ -43,7 +43,7 @@ describe GitHub do
         .to_return(body: "not json")
 
       expect_raises(Exception) do
-        GitHub.lastest_release_tag
+        GitHub.latest_release_tag
       end
     end
   end
