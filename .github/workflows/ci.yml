@@ -19,9 +19,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Update packages
-        run: apt-get update && apt-get upgrade -y
-
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
         with:
