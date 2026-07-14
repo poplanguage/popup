@@ -19,6 +19,9 @@ dependencies:
     github: naqvis/option_builder
   term-prompt:
     github: crystal-term/prompt
+  term-progress:
+    github: crystal-term/progress
+    version: ~> 1.0.0
 
 development_dependencies:
   ameba:
