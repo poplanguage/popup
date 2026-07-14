@@ -15,4 +15,9 @@ describe Utils::Target do
     (aarch64 || x86_64).should be_true
     (aarch64 && x86_64).should be_false
   end
+
+  it "returns a target string in the expected format" do
+    target = Utils::Target.target_string
+    target.should match(/^(x86_64|aarch64)-unknown-linux-gnu$/)
+  end
 end

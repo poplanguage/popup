@@ -28,4 +28,14 @@ module Popup::Utils::Target
       false
     {% end %}
   end
+
+  def target_string : String?
+    if linux?
+      if aarch64?
+        "aarch64-unknown-linux-gnu"
+      elsif x86_64?
+        "x86_64-unknown-linux-gnu"
+      end
+    end
+  end
 end
