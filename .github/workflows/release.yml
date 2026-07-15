@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-latest
+    container:
+      image: crystallang/crystal:latest-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: shards build popup --production --release --static --no-debug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: popup-x86_64-unknown-linux-gnu
+          path: bin/popup
+
+  build-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build in aarch64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "${{ github.workspace }}:/src" -w /src \
+            crystallang/crystal:latest-alpine \
+            shards build popup --production --release --static --no-debug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: popup-aarch64-unknown-linux-gnu
+          path: bin/popup
+
+  release:
+    needs: [build-x86_64, build-aarch64]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Rename binaries
+        run: |
+          mv popup-x86_64-unknown-linux-gnu/popup popup-x86_64-unknown-linux-gnu/popup-x86_64-unknown-linux-gnu
+          mv popup-aarch64-unknown-linux-gnu/popup popup-aarch64-unknown-linux-gnu/popup-aarch64-unknown-linux-gnu
+
+      - name: Create zip archives
+        run: |
+          cd popup-x86_64-unknown-linux-gnu && zip ../popup-x86_64-unknown-linux-gnu.zip popup-x86_64-unknown-linux-gnu && cd ..
+          cd popup-aarch64-unknown-linux-gnu && zip ../popup-aarch64-unknown-linux-gnu.zip popup-aarch64-unknown-linux-gnu && cd ..
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generateReleaseNotes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: |
+            popup-x86_64-unknown-linux-gnu.zip
+            popup-aarch64-unknown-linux-gnu.zip

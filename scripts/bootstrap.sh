@@ -8,7 +8,7 @@
 set -euo pipefail
 
 readonly REPO="poplanguage/popup"
-readonly GITHUB_API="https://api.github.com"
+readonly GITHUB_API="https://api.github"
 readonly INSTALL_DIR="$HOME/.popup"
 readonly BIN_DIR_NAME="bin"
 
@@ -78,7 +78,7 @@ resolve_version() {
 
 download_binary() {
     local url="$GITHUB_API/repos/$REPO/releases/tags/$VERSION"
-    local response asset_url
+    local response asset_url zip_path
 
     info "fetching release metadata for $VERSION..."
     response=$(github_get "$url") || \
@@ -87,6 +87,7 @@ download_binary() {
     asset_url=$(printf '%s' "$response" | \
         grep -o '"browser_download_url":"[^"]*' | \
         grep "$PLATFORM" | \
+        grep '\.zip"' | \
         head -1 | \
         sed 's/"browser_download_url":"//') || \
         true
@@ -95,10 +96,20 @@ download_binary() {
         die "no asset found for platform $PLATFORM in release $VERSION"
 
     info "downloading: $asset_url"
-    curl -fSL -o "$TEMP_DIR/popup" "$asset_url" || \
+    zip_path="$TEMP_DIR/popup.zip"
+    curl -fSL -o "$zip_path" "$asset_url" || \
         die "download failed"
 
-    chmod +x "$TEMP_DIR/popup"
+    info "extracting..."
+    unzip -qo "$zip_path" -d "$TEMP_DIR" || \
+        die "could not extract zip"
+
+    local binary_name="popup-${PLATFORM}"
+    if [ ! -f "$TEMP_DIR/$binary_name" ]; then
+        die "binary $binary_name not found in archive"
+    fi
+
+    chmod +x "$TEMP_DIR/$binary_name"
     info "download complete"
 }
 
@@ -112,12 +123,13 @@ do_install() {
     info "installing to $INSTALL_DIR..."
     mkdir -p "$bin_dir" || die "could not create $bin_dir"
 
-    mv "$TEMP_DIR/popup" "$bin_dir/popup" || \
+    local binary_name="popup-${PLATFORM}"
+    mv "$TEMP_DIR/$binary_name" "$bin_dir/popup" || \
         die "could not move binary to $bin_dir"
 
     TEMP_DIR=""
 
-    info "installed: $bin_dir/popup"
+    info "installed: $bin_dir/pop"
     ensure_path "$bin_dir"
 }
 
@@ -222,6 +234,7 @@ read_choice() {
 
 main() {
     command -v curl >/dev/null 2>&1 || die "curl is required but not found"
+    command -v unzip >/dev/null 2>&1 || die "unzip is required but not found"
 
     show_menu
     read_choice
