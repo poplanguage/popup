@@ -1,4 +1,5 @@
 require "term-prompt"
+require "colorize"
 
 class Popup::CLI::Install
   def self.register(cmd)
@@ -11,11 +12,17 @@ class Popup::CLI::Install
 
       install.run do
         current_version = version.empty? ? GitHub.latest_release_tag : version
+        target = Utils::Target.target_string
+
+        Log.info { "installing toolchain #{current_version} (#{target})" }
+
         archive_path = Installer.new(current_version).install
         toolchain = Toolchain.new
 
         Installer::Setup.new(current_version, archive_path, toolchain.toolchains_dir).run
-        toolchain.install(current_version, Utils::Target.target_string)
+        toolchain.install(current_version, target)
+
+        Log.info { "toolchain #{current_version} installed successfully".colorize(:green) }
 
         prompt_add_to_path(toolchain)
       end
@@ -31,7 +38,7 @@ class Popup::CLI::Install
     return unless profile
 
     if already_configured?(profile)
-      puts "=> PATH already configured in #{profile}"
+      Log.info { "PATH already configured in #{profile}" }
       return
     end
 
@@ -43,10 +50,9 @@ class Popup::CLI::Install
         file.puts %(export PATH="$HOME/.popup/bin:$PATH")
       end
 
-      prompt.ok("Added to #{profile}")
+      Log.info { "added to #{profile}" }
     else
-      puts "=> Add this line to #{profile}:"
-      puts %(   export PATH="$HOME/.popup/bin:$PATH")
+      Log.info { "add this line to #{profile}: export PATH=\"$HOME/.popup/bin:$PATH\"" }
     end
   end
 
@@ -65,11 +71,11 @@ class Popup::CLI::Install
 
   private def self.already_configured?(profile : String) : Bool
     if File.exists?(profile)
-      true
-    else
       File.read_lines(profile).any? do |line|
         line.strip == %(export PATH="$HOME/.popup/bin:$PATH")
       end
+    else
+      false
     end
   end
 end

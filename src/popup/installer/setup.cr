@@ -9,6 +9,8 @@ class Popup::Installer::Setup
     version_dir = File.join(@toolchains_dir, @version)
     temp_name = File.tempname("popup")
 
+    Log.info { "extracting toolchain..." }
+
     Dir.mkdir_p(temp_name)
     unzip_file(temp_name)
 
@@ -18,6 +20,8 @@ class Popup::Installer::Setup
 
     File.rename(temp_name, version_dir)
     File.delete(@archive_path)
+
+    Log.info { "extracted to #{version_dir}" }
   end
 
   private def unzip_file(temp_name : String)

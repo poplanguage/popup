@@ -14,11 +14,7 @@ module Popup::Utils::Target
   end
 
   def linux? : Bool
-    {% if flag?(:linux) %}
-      true
-    {% else %}
-      false
-    {% end %}
+    File.exists?("/proc") && File.directory?("/proc")
   end
 
   def target_string : String

@@ -9,37 +9,34 @@ class Popup::Installer
     end
 
     def run : String
-      bar = Term::Progress::Bar.new(
-        total: file_size,
-        format: "  Downloading [:bar] :percent :byte_rate ETA: :eta",
-        complete_char: '#',
-        incomplete_char: ' '
-      )
-
       Crest.get(@url) do |response|
+        headers = response.headers["Content-Length"]?
+        total = case headers
+                when Array(String) then headers.first?.try &.to_i64 || 0_i64
+                when String        then headers.to_i64
+                else
+                  0_i64
+                end
+
+        @bar = Term::Progress::Bar.new(
+          total: total,
+          format: "  Downloading [:bar] :percent :byte_rate",
+          complete_char: '#',
+          incomplete_char: ' '
+        )
+
         File.open(@path, "wb") do |file|
           buffer = Bytes.new(CHUNK_SIZE)
 
           while (n = response.body_io.read(buffer)) && n > 0
             file.write(buffer[0, n])
-            bar.advance(n.to_i64)
+            @bar.try &.advance(n.to_i64)
           end
         end
       end
 
-      bar.finish("  Downloaded!")
+      @bar.try &.finish("  Downloaded!")
       @path
-    end
-
-    private def file_size : Int64
-      response = Crest.head(@url)
-      content_length = response.headers["Content-Length"]?
-
-      if content_length.is_a?(String)
-        content_length.to_i64
-      else
-        0_i64
-      end
     end
   end
 end

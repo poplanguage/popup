@@ -8,6 +8,7 @@ module Popup
     def install : String
       target = Utils::Target.target_string
 
+      Log.info { "fetching release #{@version}..." }
       response = JSON.parse(
         GitHub.client.get("repos/poplanguage/pop/releases/tags/#{@version}").body
       )

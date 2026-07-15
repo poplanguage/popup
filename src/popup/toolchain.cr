@@ -39,6 +39,8 @@ module Popup
       end
 
       File.symlink(version, default_link)
+      Log.info { "set default toolchain to #{version}" }
+
       Dir.mkdir_p(@bin_dir)
 
       content = <<-SHIM
@@ -48,6 +50,7 @@ module Popup
 
       File.write(@shim_path, content)
       File.chmod(@shim_path, 0o755)
+      Log.info { "wrote shim to #{@shim_path}" }
     end
 
     private def default_link : String
