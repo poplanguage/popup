@@ -4,7 +4,7 @@ require "json"
 require "crest"
 require "file_utils"
 
-require "../src/popup"
+require "../src/popup/**"
 
 include Popup
 
