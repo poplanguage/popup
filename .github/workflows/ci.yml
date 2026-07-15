@@ -44,8 +44,10 @@ jobs:
       - name: Run tests
         run: crystal spec --verbose
 
+      - run: shards build ameba -Dpreview_mt
+
       - name: Lint
         run: bin/ameba
 
       - name: Build
-        run: shards build
+        run: shards build popup
