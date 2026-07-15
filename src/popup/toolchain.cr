@@ -36,10 +36,9 @@ module Popup
 
       if File.symlink?(default_link)
         File.delete(default_link)
-      else
-        File.symlink(version, default_link)
       end
 
+      File.symlink(version, default_link)
       Dir.mkdir_p(@bin_dir)
 
       content = <<-SHIM
