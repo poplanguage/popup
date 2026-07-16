@@ -2,7 +2,7 @@ module Popup::Utils::Target
   extend self
 
   def current_arch : String
-    `uname -i`.strip
+    `uname -m`.strip
   end
 
   def aarch64? : Bool

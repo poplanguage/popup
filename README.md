@@ -42,11 +42,14 @@ popup install v0.1.0-rc.3
 The installer:
 
 - detects the host platform (architecture and OS)
-- fetches the matching release artifact from the `poplanguage/pop` GitHub repository
+- selects the exact matching release artifact and `.sha256` file from the
+  `poplanguage/pop` GitHub repository
+- verifies the SHA-256 digest before extraction
 - downloads the archive with progress bar, speed, and ETA
-- extracts the toolchain to `~/.popup/toolchains/<version>/`
+- rejects unsafe or incomplete archives and extracts transactionally to
+  `~/.popup/toolchains/<version>/`
 - creates a `default` symlink to the active toolchain
-- writes a `pop` shim to `~/.popup/bin/pop`
+- writes `pop` and `pop-language-server` shims to `~/.popup/bin/`
 - offers to add `~/.popup/bin` to your PATH
 
 ```sh
@@ -61,6 +64,7 @@ List installed toolchain versions.
 ~/.popup/
   bin/
     pop              # shim that delegates to the active toolchain
+    pop-language-server
   toolchains/
     default -> v0.1.0-rc.3   # symlink to the active version
     v0.1.0-rc.3/             # extracted toolchain files
@@ -69,6 +73,8 @@ List installed toolchain versions.
 ## Configuration
 
 `popup` respects the `POPUP_HOME` environment variable. If unset, it defaults to `~/.popup`.
+The generated shim retains the selected installation root; custom roots do not
+fall back to `$HOME/.popup`.
 
 ## Uninstallation
 

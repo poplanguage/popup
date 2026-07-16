@@ -6,11 +6,13 @@ module Popup
     getter bin_dir : String
     getter toolchains_dir : String
     getter shim_path : String
+    getter language_server_shim_path : String
 
     def initialize(@base_dir = ENV.fetch("POPUP_HOME", DEFAULT_BASE_DIR))
       @bin_dir = File.join(@base_dir, "bin")
       @toolchains_dir = File.join(@base_dir, "toolchains")
       @shim_path = File.join(@bin_dir, "pop")
+      @language_server_shim_path = File.join(@bin_dir, "pop-language-server")
     end
 
     def versions : Array(String)
@@ -43,18 +45,27 @@ module Popup
 
       Dir.mkdir_p(@bin_dir)
 
-      content = <<-SHIM
-        #!/usr/bin/env bash
-        exec "$HOME/.popup/toolchains/default/pop-#{target}" "$@"
-      SHIM
-
-      File.write(@shim_path, content)
-      File.chmod(@shim_path, 0o755)
+      write_shim(@shim_path, "pop-#{target}")
+      write_shim(@language_server_shim_path, "pop-language-server-#{target}")
       Log.info { "wrote shim to #{@shim_path}" }
     end
 
     private def default_link : String
       File.join(@toolchains_dir, "default")
+    end
+
+    private def write_shim(path : String, executable : String) : Nil
+      content = <<-SHIM
+        #!/usr/bin/env bash
+        set -euo pipefail
+        exec #{shell_quote(File.join(@toolchains_dir, "default", executable))} "$@"
+      SHIM
+      File.write(path, content)
+      File.chmod(path, 0o755)
+    end
+
+    private def shell_quote(value : String) : String
+      "'#{value.gsub("'", %q('\\''))}'"
     end
   end
 end
