@@ -49,7 +49,7 @@ The installer:
 - rejects unsafe or incomplete archives and extracts transactionally to
   `~/.popup/toolchains/<version>/`
 - creates a `default` symlink to the active toolchain
-- writes a `pop` shim to `~/.popup/bin/pop`
+- writes `pop` and `pop-language-server` shims to `~/.popup/bin/`
 - offers to add `~/.popup/bin` to your PATH
 
 ```sh
@@ -64,6 +64,7 @@ List installed toolchain versions.
 ~/.popup/
   bin/
     pop              # shim that delegates to the active toolchain
+    pop-language-server
   toolchains/
     default -> v0.1.0-rc.3   # symlink to the active version
     v0.1.0-rc.3/             # extracted toolchain files

@@ -50,7 +50,7 @@ class Popup::Installer::Setup
 
           FileUtils.mkdir_p(File.dirname(out_path))
           File.write(out_path, io.gets_to_end)
-          mode = relative == "pop-#{@target}" ? 0o755 : 0o644
+          mode = executable?(relative) ? 0o755 : 0o644
           File.chmod(out_path, mode)
         end
       end
@@ -59,6 +59,10 @@ class Popup::Installer::Setup
     FileUtils.rm_rf(temp_name)
     raise ex if ex.message.try(&.starts_with?("unsafe archive entry"))
     raise "failed to extract #{File.basename(@archive_path)}: #{ex.message}"
+  end
+
+  private def executable?(relative : String) : Bool
+    relative == "pop-#{@target}" || relative == "pop-language-server-#{@target}"
   end
 
   private def safe_entry(filename : String) : String
@@ -73,6 +77,7 @@ class Popup::Installer::Setup
   private def validate_toolchain(directory : String) : Nil
     required = [
       "pop-#{@target}",
+      "pop-language-server-#{@target}",
       "libpop_standard.a",
       "libpop_runtime_native.a",
     ]
