@@ -13,33 +13,58 @@ describe Installer do
     context "when a matching asset exists" do
       it "downloads the correct binary for the current platform" do
         WebMock.stub(:head, InstallUtils::DOWNLOAD_URL)
-          .to_return(headers: {"Content-Length" => "16"})
+          .to_return(headers: {"Content-Length" => InstallUtils::ARCHIVE_CONTENT.bytesize.to_s})
+        WebMock.stub(:head, InstallUtils::CHECKSUM_URL)
+          .to_return(headers: {"Content-Length" => "96"})
 
         WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
           .to_return(body: InstallUtils.release_with_binary.to_json)
 
         WebMock.stub(:get, InstallUtils::DOWNLOAD_URL)
-          .to_return(body_io: IO::Memory.new("pop binary content"))
+          .to_return(body_io: IO::Memory.new(InstallUtils::ARCHIVE_CONTENT))
+        WebMock.stub(:get, InstallUtils::CHECKSUM_URL)
+          .to_return(body_io: IO::Memory.new("#{InstallUtils::ARCHIVE_SHA256}  #{InstallUtils::ASSET_NAME}\n"))
 
         result = Installer.new("v0.1.0").install
 
         File.exists?(result).should be_true
-        File.read(result).should eq("pop binary content")
+        File.read(result).should eq(InstallUtils::ARCHIVE_CONTENT)
       end
 
-      it "skips sha256 files when selecting the binary" do
+      it "requires and verifies the exact matching sha256 asset" do
         WebMock.stub(:head, InstallUtils::DOWNLOAD_URL)
-          .to_return(headers: {"Content-Length" => "16"})
+          .to_return(headers: {"Content-Length" => InstallUtils::ARCHIVE_CONTENT.bytesize.to_s})
+        WebMock.stub(:head, InstallUtils::CHECKSUM_URL)
+          .to_return(headers: {"Content-Length" => "96"})
 
         WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
           .to_return(body: InstallUtils.release_with_binary_and_sha.to_json)
 
         WebMock.stub(:get, InstallUtils::DOWNLOAD_URL)
-          .to_return(body_io: IO::Memory.new("pop binary content"))
+          .to_return(body_io: IO::Memory.new(InstallUtils::ARCHIVE_CONTENT))
+        WebMock.stub(:get, InstallUtils::CHECKSUM_URL)
+          .to_return(body_io: IO::Memory.new("#{InstallUtils::ARCHIVE_SHA256}  #{InstallUtils::ASSET_NAME}\n"))
 
         result = Installer.new("v0.1.0").install
 
         File.exists?(result).should be_true
+      end
+
+      it "rejects an archive whose digest does not match" do
+        WebMock.stub(:head, InstallUtils::DOWNLOAD_URL)
+          .to_return(headers: {"Content-Length" => InstallUtils::ARCHIVE_CONTENT.bytesize.to_s})
+        WebMock.stub(:head, InstallUtils::CHECKSUM_URL)
+          .to_return(headers: {"Content-Length" => "96"})
+        WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
+          .to_return(body: InstallUtils.release_with_binary.to_json)
+        WebMock.stub(:get, InstallUtils::DOWNLOAD_URL)
+          .to_return(body_io: IO::Memory.new(InstallUtils::ARCHIVE_CONTENT))
+        WebMock.stub(:get, InstallUtils::CHECKSUM_URL)
+          .to_return(body_io: IO::Memory.new("#{"0" * 64}  #{InstallUtils::ASSET_NAME}\n"))
+
+        expect_raises(Exception, "checksum mismatch") do
+          Installer.new("v0.1.0").install
+        end
       end
     end
 
@@ -48,7 +73,16 @@ describe Installer do
         WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
           .to_return(body: InstallUtils.release_for_wrong_arch.to_json)
 
-        expect_raises(Exception, "no asset found for target") do
+        expect_raises(Exception, "no exact toolchain asset") do
+          Installer.new("v0.1.0").install
+        end
+      end
+
+      it "rejects a release without an exact checksum asset" do
+        WebMock.stub(:get, "https://api.github.com/repos/poplanguage/pop/releases/tags/v0.1.0")
+          .to_return(body: InstallUtils.release_with_binary_and_sha.tap { |release| release["assets"].as(Array).pop }.to_json)
+
+        expect_raises(Exception, "checksum asset") do
           Installer.new("v0.1.0").install
         end
       end

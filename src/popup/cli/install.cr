@@ -19,7 +19,12 @@ class Popup::CLI::Install
         archive_path = Installer.new(current_version).install
         toolchain = Toolchain.new
 
-        Installer::Setup.new(current_version, archive_path, toolchain.toolchains_dir).run
+        Installer::Setup.new(
+          current_version,
+          archive_path,
+          toolchain.toolchains_dir,
+          target
+        ).run
         toolchain.install(current_version, target)
 
         Log.info { "toolchain #{current_version} installed successfully".colorize(:green) }

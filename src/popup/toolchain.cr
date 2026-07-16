@@ -45,7 +45,8 @@ module Popup
 
       content = <<-SHIM
         #!/usr/bin/env bash
-        exec "$HOME/.popup/toolchains/default/pop-#{target}" "$@"
+        set -euo pipefail
+        exec #{shell_quote(File.join(@toolchains_dir, "default", "pop-#{target}"))} "$@"
       SHIM
 
       File.write(@shim_path, content)
@@ -55,6 +56,10 @@ module Popup
 
     private def default_link : String
       File.join(@toolchains_dir, "default")
+    end
+
+    private def shell_quote(value : String) : String
+      "'#{value.gsub("'", %q('\\''))}'"
     end
   end
 end
