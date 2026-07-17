@@ -1,3 +1,5 @@
+require "file_utils"
+
 module Popup
   class Toolchain
     DEFAULT_BASE_DIR = File.join(ENV["HOME"], ".popup")
@@ -31,6 +33,24 @@ module Popup
 
     def installed?(version : String) : Bool
       Dir.exists?(File.join(@toolchains_dir, version))
+    end
+
+    def uninstall(version : String) : Nil
+      version_dir = File.join(@toolchains_dir, version)
+
+      unless Dir.exists?(version_dir)
+        raise "toolchain #{version} is not installed"
+      end
+
+      FileUtils.rm_rf(version_dir)
+      Log.info { "removed toolchain directory #{version_dir}" }
+
+      if File.symlink?(default_link) && active_version == version
+        File.delete(default_link)
+        File.delete(@shim_path) if File.exists?(@shim_path)
+        File.delete(@language_server_shim_path) if File.exists?(@language_server_shim_path)
+        Log.info { "removed active default, run `popup install` to set a new one" }
+      end
     end
 
     def install(version : String, target : String) : Nil
