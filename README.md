@@ -53,7 +53,7 @@ The installer:
 - offers to add `~/.popup/bin` to your PATH
 
 ```sh
-popup toolchains list
+popup toolchain list
 ```
 
 List installed toolchain versions.
