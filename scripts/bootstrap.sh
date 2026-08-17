@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 #
-# Install popup from the Pop Index. The index provides the release manifest,
-# immutable artifact URL, and SHA-256 checksum; GitHub is never queried here.
+# Install popup from its GitHub Release. Pop toolchains installed by popup use
+# Pop Index; the manager itself remains independently bootstrappable.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | sh
@@ -9,8 +9,9 @@
 
 set -eu
 
-INDEX_URL="${POP_INDEX_URL:-https://pop.squareweb.app}"
-INDEX_URL=${INDEX_URL%/}
+GITHUB_API="https://api.github.com"
+REPOSITORY="poplanguage/popup"
+POPUP_VERSION="${POPUP_VERSION:-}"
 INSTALL_DIR="${POPUP_HOME:-$HOME/.popup}"
 NO_MODIFY_PATH=0
 TEMP_DIR=""
@@ -47,16 +48,29 @@ detect_target() {
   esac
 }
 
-read_manifest_asset() {
-  manifest=$(curl -fsSL "$INDEX_URL/v1/releases/latest/manifest?product=popup") || die "could not fetch Popup release manifest from $INDEX_URL"
-  # Index manifests are JSON. Splitting object records lets this remain usable
-  # on minimal POSIX systems without adding a jq/Python bootstrap dependency.
-  record=$(printf '%s' "$manifest" | tr -d '\r\n\t ' | tr '{' '\n' | grep "\"name\":\"popup-${target}.zip\"" | head -n 1 || true)
-  [ -n "$record" ] || die "no popup archive for $target is published by the Pop Index"
+github_get() {
+  curl -fsSL -H "Accept: application/vnd.github+json" "$1"
+}
+
+read_release_assets() {
+  if [ -n "$POPUP_VERSION" ]; then
+    release_url="$GITHUB_API/repos/$REPOSITORY/releases/tags/$POPUP_VERSION"
+  else
+    # This includes the newest prerelease, unlike GitHub's /releases/latest.
+    release_url="$GITHUB_API/repos/$REPOSITORY/releases?per_page=1"
+  fi
+  release=$(github_get "$release_url") || die "could not fetch Popup release metadata from GitHub"
+  compact=$(printf '%s' "$release" | tr -d '\r\n\t ')
+  record=$(printf '%s' "$compact" | tr '{' '\n' | grep "\"name\":\"popup-${target}.zip\"" | head -n 1 || true)
+  checksum_record=$(printf '%s' "$compact" | tr '{' '\n' | grep "\"name\":\"popup-${target}.zip.sha256\"" | head -n 1 || true)
+  [ -n "$record" ] || die "no popup archive for $target is published on GitHub"
+  [ -n "$checksum_record" ] || die "no SHA-256 sidecar for popup-$target.zip is published on GitHub"
+  # Asset API URLs occur before GitHub's nested uploader object, so they can
+  # be parsed safely on minimal systems without a JSON runtime.
   artifact_url=$(printf '%s' "$record" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
-  expected_sha=$(printf '%s' "$record" | sed -n 's/.*"sha256":"\([0-9A-Fa-f][0-9A-Fa-f]*\)".*/\1/p')
-  [ -n "$artifact_url" ] || die "published popup artifact has no URL"
-  printf '%s' "$expected_sha" | grep -Eq '^[0-9A-Fa-f]{64}$' || die "published popup artifact has an invalid SHA-256"
+  checksum_url=$(printf '%s' "$checksum_record" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
+  [ -n "$artifact_url" ] || die "published popup archive has no download URL"
+  [ -n "$checksum_url" ] || die "published popup checksum has no download URL"
 }
 
 verify_sha256() {
@@ -75,15 +89,15 @@ install_binary() {
   TEMP_DIR=$(mktemp -d) || die "could not create temporary directory"
   chmod 700 "$TEMP_DIR"
   archive="$TEMP_DIR/popup.zip"
-  download_url=$artifact_url
-  case "$download_url" in
-    http://*|https://*) ;;
-    /*) download_url="$INDEX_URL$download_url" ;;
-    *) download_url="$INDEX_URL/$download_url" ;;
-  esac
+  checksum="$TEMP_DIR/popup.zip.sha256"
 
   info "downloading popup for $target"
-  curl -fL --retry 3 -o "$archive" "$download_url" || die "popup download failed"
+  curl -fL --retry 3 -H "Accept: application/octet-stream" -o "$archive" "$artifact_url" || die "popup download failed"
+  curl -fL --retry 3 -H "Accept: application/octet-stream" -o "$checksum" "$checksum_url" || die "popup checksum download failed"
+  expected_sha=$(awk '{print $1}' "$checksum")
+  checksum_name=$(awk '{print $2}' "$checksum" | sed 's/^\*//;s|.*/||')
+  [ "$checksum_name" = "popup-$target.zip" ] || die "invalid SHA-256 sidecar for popup-$target.zip"
+  printf '%s' "$expected_sha" | grep -Eq '^[0-9A-Fa-f]{64}$' || die "invalid SHA-256 sidecar for popup-$target.zip"
   verify_sha256 "$archive"
   unzip -q "$archive" -d "$TEMP_DIR/unpacked" || die "could not extract popup archive"
   source_binary="$TEMP_DIR/unpacked/popup-$target"
@@ -136,7 +150,7 @@ main() {
   need sed
   need grep
   detect_target
-  read_manifest_asset
+  read_release_assets
   install_binary
   configure_path
   info "installed popup to $INSTALL_DIR/bin/popup"

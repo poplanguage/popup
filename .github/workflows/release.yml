@@ -65,7 +65,7 @@ jobs:
               cd "dist/$bundle"
               zip -9 "../$bundle.zip" "$bundle"
               cd ../..
-              sha256sum "dist/$bundle.zip" > "dist/$bundle.zip.sha256"
+              (cd dist && sha256sum "$bundle.zip" > "$bundle.zip.sha256")
               rm -rf "dist/$bundle"
             '
 

@@ -4,7 +4,7 @@
 
 A toolchain manager for Pop Language. Downloads, installs, and manages Pop compiler and runtime distributions.
 
-`popup` handles toolchain distribution independently from `pop`, the language and package command. It behaves like `rustup`: one manager, many installed toolchains, one selected default. All release discovery, artifact downloads, and SHA-256 checksums come from the [Pop Index](https://pop.squareweb.app/), rather than directly from GitHub.
+`popup` handles toolchain distribution independently from `pop`, the language and package command. It behaves like `rustup`: one manager, many installed toolchains, one selected default. Pop toolchains come from the [Pop Index](https://pop.squareweb.app/); Popup itself is bootstrapped from its verified GitHub Release.
 
 ## Installation
 
@@ -23,7 +23,7 @@ shards build
 curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | bash
 ```
 
-The script detects `x86_64` and `aarch64` on Linux and macOS, downloads the matching `popup` archive from the Pop Index, verifies its manifest SHA-256, and adds `~/.popup/bin` to bash, zsh, fish, or POSIX-shell startup files. Set `POPUP_HOME` before running it to choose another installation root; use `--no-modify-path` to leave shell files untouched.
+The script detects `x86_64` and `aarch64` on Linux and macOS, downloads the matching `popup` archive and SHA-256 sidecar from its GitHub Release, verifies it, and adds `~/.popup/bin` to bash, zsh, fish, or POSIX-shell startup files. Set `POPUP_HOME` before running it to choose another installation root; use `--no-modify-path` to leave shell files untouched. Set `POPUP_VERSION` to install a specific release, including a prerelease.
 
 ### Windows (PowerShell)
 
@@ -31,7 +31,7 @@ The script detects `x86_64` and `aarch64` on Linux and macOS, downloads the matc
 irm https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.ps1 | iex
 ```
 
-The PowerShell installer uses the same Pop Index manifest and SHA-256 verification, installs to `%USERPROFILE%\.popup\bin`, and writes `POPUP_HOME` and the bin directory to the user environment. Use `-NoModifyPath` when running the checked-out script to skip that environment change.
+The PowerShell installer uses the same GitHub Release SHA-256 verification, installs to `%USERPROFILE%\.popup\bin`, and writes `POPUP_HOME` and the bin directory to the user environment. Use `-NoModifyPath` when running the checked-out script to skip that environment change.
 
 Popup requires a published manager archive for the detected target. If a target is not yet published, the installer reports that exact missing artifact instead of choosing another platform.
 
@@ -120,7 +120,7 @@ crystal spec
 
 ## Releasing
 
-Push a semantic `v*` tag, or run **Publish Release** manually with a semantic tag. CI builds native `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` manager archives, uploads their SHA-256 sidecars, and creates the GitHub release. Pop Index then discovers that release and makes the verified manager archives available to `bootstrap.sh`.
+Push a semantic `v*` tag, or run **Publish Release** manually with a semantic tag. CI builds native `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` manager archives, uploads their SHA-256 sidecars, and creates the GitHub release used by `bootstrap.sh`.
 
 ## Contributing
 
