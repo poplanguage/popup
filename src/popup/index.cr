@@ -1,44 +1,51 @@
 require "json"
-require "crest"
+require "uri"
 
-# Client for the public Pop Index.  The index is the release authority for
-# popup: it preserves release metadata and checksums even when upstream GitHub
-# releases change or disappear.
 module Popup::Index
   DEFAULT_URL = "https://pop.squareweb.app"
 
   class Artifact
+    include JSON::Serializable
+
+    struct Target
+      include JSON::Serializable
+
+      getter os : String
+      getter arch : String
+    end
+
     getter id : Int64
     getter name : String
-    getter os : String
-    getter arch : String
-    getter archive_format : String?
     getter size : Int64
     getter sha256 : String
     getter url : String
+    getter archive_format : String?
+
+    @[JSON::Field(key: "available")]
     getter? available : Bool
 
-    def initialize(@id, @name, @os, @arch, @archive_format, @size, @sha256, @url, @available)
-    end
+    getter target : Target
 
-    def zip? : Bool
+    def zip?
       @archive_format == "zip"
     end
   end
 
   class Manifest
+    include JSON::Serializable
+
     getter product : String
     getter version : String
     getter tag : String
     getter channel : String
     getter artifacts : Array(Artifact)
 
-    def initialize(@product, @version, @tag, @channel, @artifacts)
-    end
-
     def artifact_for(target : Utils::Target::Platform) : Artifact
       @artifacts.find do |artifact|
-        artifact.available? && artifact.os == target.os && artifact.arch == target.arch && artifact.zip?
+        artifact.available? &&
+          artifact.target.os == target.os &&
+          artifact.target.arch == target.arch &&
+          artifact.zip?
       end || raise "no available #{@product} archive for #{target.label} in release #{@version}"
     end
   end
@@ -61,14 +68,19 @@ module Popup::Index
   end
 
   def self.download_url(relative_url : String) : String
-    return relative_url if relative_url.starts_with?("https://") || relative_url.starts_with?("http://")
-    "#{base_url}#{relative_url.starts_with?('/') ? relative_url : "/#{relative_url}"}"
+    if (url = URI.parse(relative_url)) && url.scheme == "https" || url.scheme == "http"
+      relative_url
+    else
+      "#{base_url}#{relative_url.starts_with?('/') ? relative_url : "/#{relative_url}"}"
+    end
   end
 
   private def self.get_manifest(path : String) : Manifest
-    response = client.get(path)
-    raise "Pop Index request failed (HTTP #{response.status_code}) for #{path}" unless response.success?
-    parse_manifest(JSON.parse(response.body))
+    if (response = client.get(path)) && response.success?
+      Manifest.from_json(response.body)
+    else
+      raise "Pop Index request failed (HTTP #{response.status_code}) for #{path}"
+    end
   rescue ex : Crest::RequestFailed
     raise "Pop Index request failed (HTTP #{ex.http_code}) for #{path}"
   rescue ex : JSON::ParseException
@@ -77,30 +89,5 @@ module Popup::Index
 
   private def self.client : Crest::Resource
     Crest::Resource.new("#{base_url}/", headers: {"Accept" => "application/json"})
-  end
-
-  private def self.parse_manifest(data : JSON::Any) : Manifest
-    artifacts = data["artifacts"].as_a.map do |item|
-      target = item["target"]
-      Artifact.new(
-        item["id"].as_i64,
-        item["name"].as_s,
-        target["os"].as_s,
-        target["arch"].as_s,
-        item["archive_format"]?.try(&.as_s?),
-        item["size"].as_i64,
-        item["sha256"].as_s,
-        item["url"].as_s,
-        item["available"].as_bool
-      )
-    end
-
-    Manifest.new(
-      data["product"].as_s,
-      data["version"].as_s,
-      data["tag"].as_s,
-      data["channel"].as_s,
-      artifacts
-    )
   end
 end
