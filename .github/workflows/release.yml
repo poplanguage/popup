@@ -50,7 +50,7 @@ jobs:
             -w /src \
             crystallang/crystal:1.20.1-alpine \
             sh -ec '
-              apk add --no-cache git zip
+              apk add --no-cache git readline-dev zip
               shards install --production
               shards build popup --production --release --static --no-debug
 
