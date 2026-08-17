@@ -22,6 +22,7 @@ jobs:
     if: github.repository == 'poplanguage/popup'
     name: Build popup (${{ matrix.target }})
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -29,8 +30,6 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    container:
-      image: crystallang/crystal:1.20.1-alpine
 
     steps:
       - name: Check out source
@@ -38,23 +37,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install packaging tools
-        run: apk add --no-cache git zip
+      - name: Prepare Crystal container
+        run: |
+          docker pull crystallang/crystal:1.20.1-alpine
 
       - name: Build popup
+        shell: bash
         run: |
-          set -eu
-          shards install --production
-          shards build popup --production --release --static --no-debug
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            crystallang/crystal:1.20.1-alpine \
+            sh -ec '
+              apk add --no-cache git zip
+              shards install --production
+              shards build popup --production --release --static --no-debug
 
-          bundle="popup-${{ matrix.target }}"
-          mkdir -p "dist/$bundle"
-          cp bin/popup "dist/$bundle/$bundle"
-          cd "dist/$bundle"
-          zip -9 "../$bundle.zip" "$bundle"
-          cd ../..
-          sha256sum "dist/$bundle.zip" > "dist/$bundle.zip.sha256"
-          rm -rf "dist/$bundle"
+              bundle="popup-${{ matrix.target }}"
+              mkdir -p "dist/$bundle"
+              cp bin/popup "dist/$bundle/$bundle"
+              cd "dist/$bundle"
+              zip -9 "../$bundle.zip" "$bundle"
+              cd ../..
+              sha256sum "dist/$bundle.zip" > "dist/$bundle.zip.sha256"
+              rm -rf "dist/$bundle"
+            '
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
