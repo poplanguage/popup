@@ -52,7 +52,12 @@ jobs:
             sh -ec '
               apk add --no-cache git ncurses-static readline-static zip
               shards install --production
-              shards build popup --production --release --static --no-debug
+
+              # Crystal places its own -lreadline after --link-flags. For a
+              # static link, ncurses must therefore be appended after it.
+              printf "%s\\n" "#!/bin/sh" "exec cc \"\$@\" -lncursesw" > /tmp/popup-cc
+              chmod +x /tmp/popup-cc
+              CC=/tmp/popup-cc shards build popup --production --release --static --no-debug
 
               bundle="popup-${{ matrix.target }}"
               mkdir -p "dist/$bundle"
