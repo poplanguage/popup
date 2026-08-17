@@ -1,73 +1,103 @@
-name: Release
+name: Publish Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Semantic version tag, for example v1.2.3 or v1.2.3-rc.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
-  build-x86_64:
-    runs-on: ubuntu-latest
+  build:
+    if: github.repository == 'poplanguage/popup'
+    name: Build popup (${{ matrix.target }})
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     container:
-      image: crystallang/crystal:latest-alpine
+      image: crystallang/crystal:1.20.1-alpine
+
     steps:
-      - uses: actions/checkout@v4
-
-      - run: shards build popup --production --release --static --no-debug
-
-      - uses: actions/upload-artifact@v4
+      - name: Check out source
+        uses: actions/checkout@v5
         with:
-          name: popup-x86_64-unknown-linux-gnu
-          path: bin/popup
+          fetch-depth: 0
 
-  build-aarch64:
+      - name: Install packaging tools
+        run: apk add --no-cache git zip
+
+      - name: Build popup
+        run: |
+          set -eu
+          shards install --production
+          shards build popup --production --release --static --no-debug
+
+          bundle="popup-${{ matrix.target }}"
+          mkdir -p "dist/$bundle"
+          cp bin/popup "dist/$bundle/$bundle"
+          cd "dist/$bundle"
+          zip -9 "../$bundle.zip" "$bundle"
+          cd ../..
+          sha256sum "dist/$bundle.zip" > "dist/$bundle.zip.sha256"
+          rm -rf "dist/$bundle"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: popup-${{ matrix.target }}
+          path: |
+            dist/popup-${{ matrix.target }}.zip
+            dist/popup-${{ matrix.target }}.zip.sha256
+
+  publish:
+    if: github.repository == 'poplanguage/popup' && github.actor == 'kleeedolinux'
+    needs: build
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Build in aarch64 container
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "${{ github.workspace }}:/src" -w /src \
-            crystallang/crystal:latest-alpine \
-            shards build popup --production --release --static --no-debug
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: popup-aarch64-unknown-linux-gnu
-          path: bin/popup
-
-  release:
-    needs: [build-x86_64, build-aarch64]
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Check out source
+        uses: actions/checkout@v5
 
-      - name: Rename binaries
-        run: |
-          mv popup-x86_64-unknown-linux-gnu/popup popup-x86_64-unknown-linux-gnu/popup-x86_64-unknown-linux-gnu
-          mv popup-aarch64-unknown-linux-gnu/popup popup-aarch64-unknown-linux-gnu/popup-aarch64-unknown-linux-gnu
-
-      - name: Create zip archives
-        run: |
-          cd popup-x86_64-unknown-linux-gnu && zip ../popup-x86_64-unknown-linux-gnu.zip popup-x86_64-unknown-linux-gnu && cd ..
-          cd popup-aarch64-unknown-linux-gnu && zip ../popup-aarch64-unknown-linux-gnu.zip popup-aarch64-unknown-linux-gnu && cd ..
-
-      - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
+      - name: Download binaries
+        uses: actions/download-artifact@v4
         with:
-          tag: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          generateReleaseNotes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: |
-            popup-x86_64-unknown-linux-gnu.zip
-            popup-aarch64-unknown-linux-gnu.zip
+          pattern: popup-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version tag: $tag"
+            exit 1
+          fi
+
+          prerelease_args=()
+          [[ "$tag" == *-* ]] && prerelease_args+=(--prerelease)
+
+          gh release create "$tag" \
+            dist/* \
+            --title "$tag" \
+            --generate-notes \
+            "${prerelease_args[@]}"

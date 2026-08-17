@@ -4,7 +4,7 @@
 
 A toolchain manager for Pop Language. Downloads, installs, and manages Pop compiler and runtime distributions.
 
-`popup` handles toolchain distribution independently from `pop`, the language and package command. It fetches verified release artifacts and detects the host platform to install the correct binary.
+`popup` handles toolchain distribution independently from `pop`, the language and package command. It behaves like `rustup`: one manager, many installed toolchains, one selected default. All release discovery, artifact downloads, and SHA-256 checksums come from the [Pop Index](https://pop.squareweb.app/), rather than directly from GitHub.
 
 ## Installation
 
@@ -17,19 +17,31 @@ shards install
 shards build
 ```
 
-### Bootstrap script (WIP)
+### macOS and Linux
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | bash
 ```
 
+The script detects `x86_64` and `aarch64` on Linux and macOS, downloads the matching `popup` archive from the Pop Index, verifies its manifest SHA-256, and adds `~/.popup/bin` to bash, zsh, fish, or POSIX-shell startup files. Set `POPUP_HOME` before running it to choose another installation root; use `--no-modify-path` to leave shell files untouched.
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.ps1 | iex
+```
+
+The PowerShell installer uses the same Pop Index manifest and SHA-256 verification, installs to `%USERPROFILE%\.popup\bin`, and writes `POPUP_HOME` and the bin directory to the user environment. Use `-NoModifyPath` when running the checked-out script to skip that environment change.
+
+Popup requires a published manager archive for the detected target. If a target is not yet published, the installer reports that exact missing artifact instead of choosing another platform.
+
 ## Usage
 
 ```sh
-popup install [version]
+popup install [version | channel:beta]
 ```
 
-Install a Pop Lang toolchain. If no version is specified, the latest release is installed.
+Install a Pop Lang toolchain. If no version is specified, the latest release is installed. A version may be written with or without its `v` prefix. `channel:beta` selects a release channel from the Index.
 
 ```sh
 # Install the latest version
@@ -41,14 +53,13 @@ popup install v0.1.0-rc.3
 
 The installer:
 
-- detects the host platform (architecture and OS)
-- selects the exact matching release artifact and `.sha256` file from the
-  `poplanguage/pop` GitHub repository
-- verifies the SHA-256 digest before extraction
+- detects the host platform (architecture and OS), including Linux, macOS, and Windows targets
+- selects the exact matching, available ZIP artifact from a Pop Index release manifest
+- verifies the manifest-provided SHA-256 digest before extraction
 - downloads the archive with progress bar, speed, and ETA
 - rejects unsafe or incomplete archives and extracts transactionally to
   `~/.popup/toolchains/<version>/`
-- creates a `default` symlink to the active toolchain
+- creates a `default` link (or Windows selection file) for the active toolchain
 - writes `pop` and `pop-language-server` shims to `~/.popup/bin/`
 - offers to add `~/.popup/bin` to your PATH
 
@@ -58,6 +69,17 @@ popup toolchains list
 
 List installed toolchain versions.
 
+```sh
+popup toolchains default v0.1.0-rc.5
+popup toolchains uninstall v0.1.0-rc.4
+popup env fish
+popup env powershell
+```
+
+`default` switches immediately among installed toolchains. `uninstall` refuses to remove the active toolchain. `env` prints safe activation commands for `sh`, bash, zsh, fish, PowerShell, or cmd; use it when a profile is managed by another tool:
+
+For example, run `popup env fish` from fish and evaluate its output there, or copy the printed commands into the relevant shell profile.
+
 ## Directory structure
 
 ```text
@@ -66,13 +88,14 @@ List installed toolchain versions.
     pop              # shim that delegates to the active toolchain
     pop-language-server
   toolchains/
-    default -> v0.1.0-rc.3   # symlink to the active version
+    default -> v0.1.0-rc.3   # symlink to the active version (Unix)
+    default.txt              # active version on Windows
     v0.1.0-rc.3/             # extracted toolchain files
 ```
 
 ## Configuration
 
-`popup` respects the `POPUP_HOME` environment variable. If unset, it defaults to `~/.popup`.
+`popup` respects the `POPUP_HOME` environment variable. If unset, it defaults to `~/.popup`. `POP_INDEX_URL` can point to a compatible Pop Index mirror; it defaults to `https://pop.squareweb.app`.
 The generated shim retains the selected installation root; custom roots do not
 fall back to `$HOME/.popup`.
 
@@ -94,6 +117,10 @@ shards build
 # Run tests
 crystal spec
 ```
+
+## Releasing
+
+Push a semantic `v*` tag, or run **Publish Release** manually with a semantic tag. CI builds native `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` manager archives, uploads their SHA-256 sidecars, and creates the GitHub release. Pop Index then discovers that release and makes the verified manager archives available to `bootstrap.sh`.
 
 ## Contributing
 

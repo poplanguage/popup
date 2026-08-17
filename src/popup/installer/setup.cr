@@ -62,7 +62,12 @@ class Popup::Installer::Setup
   end
 
   private def executable?(relative : String) : Bool
-    relative == "pop-#{@target}" || relative == "pop-language-server-#{@target}"
+    relative == executable_name("pop") || relative == executable_name("pop-language-server")
+  end
+
+  private def executable_name(program : String) : String
+    suffix = Utils::Target.platform.executable_suffix
+    "#{program}-#{@target}#{suffix}"
   end
 
   private def safe_entry(filename : String) : String
@@ -76,8 +81,8 @@ class Popup::Installer::Setup
 
   private def validate_toolchain(directory : String) : Nil
     required = [
-      "pop-#{@target}",
-      "pop-language-server-#{@target}",
+      executable_name("pop"),
+      executable_name("pop-language-server"),
       "libpop_standard.a",
       "libpop_runtime_native.a",
     ]

@@ -19,4 +19,20 @@ describe Toolchain do
   ensure
     FileUtils.rm_rf(root) if root
   end
+
+  it "switches defaults and only removes inactive toolchains" do
+    root = File.tempname("popup-toolchain-spec")
+    toolchain = Toolchain.new(root)
+    Dir.mkdir_p(File.join(toolchain.toolchains_dir, "v0.1.0"))
+    Dir.mkdir_p(File.join(toolchain.toolchains_dir, "v0.2.0"))
+    toolchain.install("v0.1.0", Utils::Target.platform)
+
+    expect_raises(Exception, "cannot uninstall the active toolchain") { toolchain.uninstall("v0.1.0") }
+    toolchain.default = "v0.2.0"
+    toolchain.active_version.should eq("v0.2.0")
+    toolchain.uninstall("v0.1.0")
+    toolchain.installed?("v0.1.0").should be_false
+  ensure
+    FileUtils.rm_rf(root) if root
+  end
 end

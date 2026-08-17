@@ -1,243 +1,145 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 #
-# bootstrap.sh - Interactive installer for popup
+# Install popup from the Pop Index. The index provides the release manifest,
+# immutable artifact URL, and SHA-256 checksum; GitHub is never queried here.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | bash
-#
-set -euo pipefail
+#   curl -fsSL https://raw.githubusercontent.com/poplanguage/popup/master/scripts/bootstrap.sh | sh
+#   POPUP_HOME=/opt/popup sh scripts/bootstrap.sh --no-modify-path
 
-readonly REPO="poplanguage/popup"
-readonly GITHUB_API="https://api.github"
-readonly INSTALL_DIR="$HOME/.popup"
-readonly BIN_DIR_NAME="bin"
+set -eu
 
+INDEX_URL="${POP_INDEX_URL:-https://pop.squareweb.app}"
+INDEX_URL=${INDEX_URL%/}
+INSTALL_DIR="${POPUP_HOME:-$HOME/.popup}"
+NO_MODIFY_PATH=0
 TEMP_DIR=""
 
-info()  { printf "=> %s\n" "$*"; }
-error() { printf "=> error: %s\n" "$*" >&2; }
-die()   { error "$@"; exit 1; }
+info() { printf '%s\n' "info: $*"; }
+die() { printf '%s\n' "error: $*" >&2; exit 1; }
 
 cleanup() {
-    if [ -d "${TEMP_DIR:-}" ]; then
-        rm -rf "$TEMP_DIR"
-    fi
+  [ -z "${TEMP_DIR:-}" ] || rm -rf "$TEMP_DIR"
 }
-trap cleanup EXIT
+trap cleanup EXIT HUP INT TERM
 
-make_temp_dir() {
-    TEMP_DIR=$(mktemp -d) || die "could not create temporary directory"
-    chmod 700 "$TEMP_DIR"
-}
+for argument in "$@"; do
+  case "$argument" in
+    --no-modify-path) NO_MODIFY_PATH=1 ;;
+    *) die "unknown argument: $argument" ;;
+  esac
+done
 
-detect_platform() {
-    local arch os
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required"; }
 
-    arch=$(uname -m 2>/dev/null) || die "could not detect architecture"
-    os=$(uname -s 2>/dev/null) || die "could not detect OS"
-
-    case "$arch" in
-        x86_64|amd64)   ARCH="x86_64" ;;
-        aarch64|arm64)  ARCH="aarch64" ;;
-        *) die "unsupported architecture: $arch" ;;
-    esac
-
-    case "$os" in
-        Linux)  OS="linux" ;;
-        Darwin) OS="darwin" ;;
-        *) die "unsupported OS: $os" ;;
-    esac
-
-    PLATFORM="${ARCH}-unknown-${OS}-gnu"
-    info "detected platform: $PLATFORM"
+detect_target() {
+  raw_os=$(uname -s 2>/dev/null || true)
+  raw_arch=$(uname -m 2>/dev/null || true)
+  case "$raw_arch" in
+    x86_64|amd64) arch=x86_64 ;;
+    aarch64|arm64) arch=aarch64 ;;
+    *) die "unsupported architecture: $raw_arch" ;;
+  esac
+  case "$raw_os" in
+    Linux) target="${arch}-unknown-linux-gnu" ;;
+    Darwin) target="${arch}-apple-darwin" ;;
+    *) die "unsupported operating system: $raw_os (use scripts/bootstrap.ps1 on Windows)" ;;
+  esac
 }
 
-github_get() {
-    local url="$1"
-    curl -fsSL \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "$url"
+read_manifest_asset() {
+  manifest=$(curl -fsSL "$INDEX_URL/v1/releases/latest/manifest?product=popup") || die "could not fetch Popup release manifest from $INDEX_URL"
+  # Index manifests are JSON. Splitting object records lets this remain usable
+  # on minimal POSIX systems without adding a jq/Python bootstrap dependency.
+  record=$(printf '%s' "$manifest" | tr -d '\r\n\t ' | tr '{' '\n' | grep "\"name\":\"popup-${target}.zip\"" | head -n 1 || true)
+  [ -n "$record" ] || die "no popup archive for $target is published by the Pop Index"
+  artifact_url=$(printf '%s' "$record" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
+  expected_sha=$(printf '%s' "$record" | sed -n 's/.*"sha256":"\([0-9A-Fa-f][0-9A-Fa-f]*\)".*/\1/p')
+  [ -n "$artifact_url" ] || die "published popup artifact has no URL"
+  printf '%s' "$expected_sha" | grep -Eq '^[0-9A-Fa-f]{64}$' || die "published popup artifact has an invalid SHA-256"
 }
 
-resolve_version() {
-    info "resolving latest version..."
-    local releases
-    releases=$(github_get "$GITHUB_API/repos/$REPO/releases") || \
-        die "could not fetch releases from GitHub"
-
-    VERSION=$(printf '%s' "$releases" | \
-        grep -o '"tag_name":"[^"]*"' | \
-        head -1 | \
-        sed 's/"tag_name":"//;s/"//') || \
-        die "could not parse version from releases"
-
-    [ -n "$VERSION" ] || die "no releases found"
-    info "latest version: $VERSION"
+verify_sha256() {
+  file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual_sha=$(sha256sum "$file" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    actual_sha=$(shasum -a 256 "$file" | awk '{print $1}')
+  else
+    die "sha256sum or shasum is required to verify popup"
+  fi
+  [ "$actual_sha" = "$expected_sha" ] || die "SHA-256 verification failed for popup"
 }
 
-download_binary() {
-    local url="$GITHUB_API/repos/$REPO/releases/tags/$VERSION"
-    local response asset_url zip_path
+install_binary() {
+  TEMP_DIR=$(mktemp -d) || die "could not create temporary directory"
+  chmod 700 "$TEMP_DIR"
+  archive="$TEMP_DIR/popup.zip"
+  download_url=$artifact_url
+  case "$download_url" in
+    http://*|https://*) ;;
+    /*) download_url="$INDEX_URL$download_url" ;;
+    *) download_url="$INDEX_URL/$download_url" ;;
+  esac
 
-    info "fetching release metadata for $VERSION..."
-    response=$(github_get "$url") || \
-        die "could not fetch release $VERSION"
-
-    asset_url=$(printf '%s' "$response" | \
-        grep -o '"browser_download_url":"[^"]*' | \
-        grep "$PLATFORM" | \
-        grep '\.zip"' | \
-        head -1 | \
-        sed 's/"browser_download_url":"//') || \
-        true
-
-    [ -n "$asset_url" ] || \
-        die "no asset found for platform $PLATFORM in release $VERSION"
-
-    info "downloading: $asset_url"
-    zip_path="$TEMP_DIR/popup.zip"
-    curl -fSL -o "$zip_path" "$asset_url" || \
-        die "download failed"
-
-    info "extracting..."
-    unzip -qo "$zip_path" -d "$TEMP_DIR" || \
-        die "could not extract zip"
-
-    local binary_name="popup-${PLATFORM}"
-    if [ ! -f "$TEMP_DIR/$binary_name" ]; then
-        die "binary $binary_name not found in archive"
-    fi
-
-    chmod +x "$TEMP_DIR/$binary_name"
-    info "download complete"
+  info "downloading popup for $target"
+  curl -fL --retry 3 -o "$archive" "$download_url" || die "popup download failed"
+  verify_sha256 "$archive"
+  unzip -q "$archive" -d "$TEMP_DIR/unpacked" || die "could not extract popup archive"
+  source_binary="$TEMP_DIR/unpacked/popup-$target"
+  [ -f "$source_binary" ] || die "archive did not contain popup-$target"
+  mkdir -p "$INSTALL_DIR/bin"
+  install -m 755 "$source_binary" "$INSTALL_DIR/bin/popup"
 }
 
-do_install() {
-    local bin_dir="$INSTALL_DIR/$BIN_DIR_NAME"
+configure_path() {
+  bin_dir="$INSTALL_DIR/bin"
+  case ":${PATH:-}:" in *":$bin_dir:"*) return ;; esac
+  [ "$NO_MODIFY_PATH" -eq 0 ] || {
+    info "activate popup with: export POPUP_HOME='$INSTALL_DIR'; export PATH='$bin_dir':\"\$PATH\""
+    return
+  }
 
-    detect_platform
-    resolve_version
-    download_binary
-
-    info "installing to $INSTALL_DIR..."
-    mkdir -p "$bin_dir" || die "could not create $bin_dir"
-
-    local binary_name="popup-${PLATFORM}"
-    mv "$TEMP_DIR/$binary_name" "$bin_dir/popup" || \
-        die "could not move binary to $bin_dir"
-
-    TEMP_DIR=""
-
-    info "installed: $bin_dir/pop"
-    ensure_path "$bin_dir"
-}
-
-ensure_path() {
-    local dir="$1"
-
-    case ":$PATH:" in
-        *":$dir:"*)
-            info "$dir is already in PATH"
-            return
-            ;;
-    esac
-
-    info ""
-    info "Add popup to your PATH by appending one of the following to your shell profile:"
-    info ""
-    info "  bash (~/.bashrc):"
-    info "    export PATH=\"$dir:\$PATH\""
-    info ""
-    info "  zsh (~/.zshrc):"
-    info "    export PATH=\"$dir:\$PATH\""
-    info ""
-    info "  fish (~/.config/fish/config.fish):"
-    info "    fish_add_path $dir"
-    info ""
-}
-
-do_uninstall() {
-    if [ ! -d "$INSTALL_DIR" ]; then
-        info "installation directory not found: $INSTALL_DIR"
-        info "nothing to uninstall"
-        return
-    fi
-
-    info "removing $INSTALL_DIR..."
-    rm -rf "$INSTALL_DIR" || die "could not remove $INSTALL_DIR"
-    info "uninstalled popup"
-    info ""
-    info "You may also remove the PATH entry for $INSTALL_DIR/$BIN_DIR_NAME from your shell profile."
-}
-
-show_menu() {
-    local installed=0
-    if [ -d "$INSTALL_DIR" ]; then
-        installed=1
-    fi
-
-    printf "\n"
-    printf "popup - Pop Language Toolchain Manager\n"
-    printf "========================================\n\n"
-
-    if [ "$installed" -eq 1 ]; then
-        printf "  [1] Install (reinstall)\n"
-        printf "  [2] Uninstall\n"
-        printf "  [3] Exit\n\n"
-    else
-        printf "  [1] Install\n"
-        printf "  [2] Exit\n\n"
-    fi
-
-    printf "Select an option: "
-}
-
-read_choice() {
-    local installed=0
-    if [ -d "$INSTALL_DIR" ]; then
-        installed=1
-    fi
-
-    read -r choice
-
-    case "$choice" in
-        1)
-            make_temp_dir
-            do_install
-            ;;
-        2)
-            if [ "$installed" -eq 1 ]; then
-                do_uninstall
-            else
-                info "exiting"
-                exit 0
-            fi
-            ;;
-        3)
-            if [ "$installed" -eq 1 ]; then
-                info "exiting"
-                exit 0
-            else
-                error "invalid option: $choice"
-                show_menu
-                read_choice
-            fi
-            ;;
-        *)
-            error "invalid option: $choice"
-            show_menu
-            read_choice
-            ;;
-    esac
+  shell_name=$(basename "${SHELL:-sh}")
+  case "$shell_name" in
+    fish)
+      profile="$HOME/.config/fish/config.fish"
+      line="set -gx POPUP_HOME '$INSTALL_DIR'\nfish_add_path '$bin_dir'"
+      ;;
+    zsh)
+      profile="$HOME/.zshrc"
+      line="export POPUP_HOME='$INSTALL_DIR'\nexport PATH='$bin_dir':\"\$PATH\""
+      ;;
+    bash)
+      profile="$HOME/.bashrc"
+      line="export POPUP_HOME='$INSTALL_DIR'\nexport PATH='$bin_dir':\"\$PATH\""
+      ;;
+    *)
+      profile="$HOME/.profile"
+      line="export POPUP_HOME='$INSTALL_DIR'\nexport PATH='$bin_dir':\"\$PATH\""
+      ;;
+  esac
+  mkdir -p "$(dirname "$profile")"
+  if [ -f "$profile" ] && grep -F "$bin_dir" "$profile" >/dev/null 2>&1; then
+    return
+  fi
+  {
+    printf '\n# popup\n'
+    printf '%b\n' "$line"
+  } >> "$profile"
+  info "added popup to $profile; restart your shell or source it to use popup"
 }
 
 main() {
-    command -v curl >/dev/null 2>&1 || die "curl is required but not found"
-    command -v unzip >/dev/null 2>&1 || die "unzip is required but not found"
-
-    show_menu
-    read_choice
+  need curl
+  need unzip
+  need sed
+  need grep
+  detect_target
+  read_manifest_asset
+  install_binary
+  configure_path
+  info "installed popup to $INSTALL_DIR/bin/popup"
 }
 
 main

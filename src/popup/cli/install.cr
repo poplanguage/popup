@@ -11,27 +11,29 @@ class Popup::CLI::Install
       end
 
       install.run do
-        current_version = version.empty? ? GitHub.latest_release_tag : version
-        target = Utils::Target.target_string
-
-        Log.info { "installing toolchain #{current_version} (#{target})" }
-
-        archive_path = Installer.new(current_version).install
-        toolchain = Toolchain.new
-
-        Installer::Setup.new(
-          current_version,
-          archive_path,
-          toolchain.toolchains_dir,
-          target
-        ).run
-        toolchain.install(current_version, target)
-
-        Log.info { "toolchain #{current_version} installed successfully".colorize(:green) }
-
-        prompt_add_to_path(toolchain)
+        install(version.empty? ? nil : version, true)
       end
     end
+  end
+
+  def self.install(version : String? = nil, prompt_for_path = false) : Toolchain
+    installer = Installer.new(version)
+    archive_path = installer.install
+    current_version = installer.version
+    target = installer.target
+    toolchain = Toolchain.new
+
+    Installer::Setup.new(
+      current_version,
+      archive_path,
+      toolchain.toolchains_dir,
+      target.triple
+    ).run
+    toolchain.install(current_version, target)
+
+    Log.info { "toolchain #{current_version} installed successfully".colorize(:green) }
+    prompt_add_to_path(toolchain) if prompt_for_path
+    toolchain
   end
 
   private def self.prompt_add_to_path(toolchain : Toolchain) : Nil
@@ -39,10 +41,11 @@ class Popup::CLI::Install
       return
     end
 
-    profile = detect_shell_profile
+    shell = File.basename(ENV["SHELL"]?.to_s)
+    profile = detect_shell_profile(shell)
     return unless profile
 
-    if already_configured?(profile)
+    if already_configured?(profile, toolchain.bin_dir)
       Log.info { "PATH already configured in #{profile}" }
       return
     end
@@ -52,19 +55,17 @@ class Popup::CLI::Install
       File.open(profile, "a") do |file|
         file.puts
         file.puts "# popup"
-        file.puts %(export PATH="$HOME/.popup/bin:$PATH")
+        file.puts Popup::Environment.render(shell, toolchain)
       end
 
       Log.info { "added to #{profile}" }
     else
-      Log.info { "add this line to #{profile}: export PATH=\"$HOME/.popup/bin:$PATH\"" }
+      Log.info { "run 'popup env #{shell}' or add its output to #{profile}" }
     end
   end
 
-  private def self.detect_shell_profile : String?
-    shell = ENV["SHELL"]?.to_s
-
-    case File.basename(shell)
+  private def self.detect_shell_profile(shell : String) : String?
+    case shell
     when "zsh"
       File.join(ENV["HOME"], ".zshrc")
     when "bash"
@@ -74,10 +75,10 @@ class Popup::CLI::Install
     end
   end
 
-  private def self.already_configured?(profile : String) : Bool
+  private def self.already_configured?(profile : String, bin_dir : String) : Bool
     if File.exists?(profile)
       File.read_lines(profile).any? do |line|
-        line.strip == %(export PATH="$HOME/.popup/bin:$PATH")
+        line.includes?(bin_dir)
       end
     else
       false
